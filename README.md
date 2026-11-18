@@ -2,6 +2,10 @@
 
 在 Windows 上查看今天、本周和本月的前台应用使用时长，包括总时长、趋势和应用排行。
 
+![应用使用情况的本周界面，显示总时长、使用趋势和应用排行](screenshot.png)
+
+*图中为示例数据。*
+
 在 [GitHub Releases](../../releases/latest) 下载 `WindowsAppUsage.exe`，双击即可运行。
 
 ## 使用方法
