@@ -1,0 +1,7 @@
+# Local build outputs and shortcuts
+*.exe
+*.lnk
+
+# Local application records and icon cache
+usage.tsv*
+icons/
