@@ -47,29 +47,55 @@ namespace AppUsage
         {
             var tick = clock.Elapsed;
             DateTime now = DateTime.UtcNow;
-            bool paused = sessionLocked || suspended;
+            bool locked = sessionLocked;
+            bool sleeping = suspended;
+            bool paused = locked || sleeping;
             double elapsed = (tick - previousTick).TotalSeconds;
             bool reset = Interlocked.Exchange(ref resetRequested, 0) != 0;
 
-            if (!paused && !reset && previousApp != null && elapsed > 0 && elapsed <= 5 &&
-                Math.Abs((now - previousUtc).TotalSeconds - elapsed) < 2)
-            {
-                double active = Math.Min(elapsed, IdleLimitSeconds - previousIdle);
-                if (active > 0)
-                    log.Add(previousUtc, previousUtc.AddSeconds(active), previousApp);
-            }
+            double idle = paused ? IdleLimitSeconds : foreground.IdleSeconds();
+            ApplicationInfo app = idle < IdleLimitSeconds ? foreground.Read() : null;
+            if (!paused && !reset && previousUtc != default(DateTime))
+                RecordInterval(log, previousUtc, now, elapsed, previousIdle, previousApp, idle, app);
 
-            previousIdle = paused ? IdleLimitSeconds : foreground.IdleSeconds();
-            previousApp = previousIdle < IdleLimitSeconds ? foreground.Read() : null;
+            previousIdle = idle;
+            previousApp = app;
             previousTick = tick;
             previousUtc = now;
 
-            if (paused)
-                Status = "会话暂停";
+            if (sleeping)
+                Status = "系统休眠暂停";
+            else if (locked)
+                Status = "会话锁定或断开";
             else if (previousIdle >= IdleLimitSeconds)
                 Status = "空闲暂停";
+            else if (previousApp == null)
+                Status = "当前窗口不计时";
             else
                 Status = "正在记录";
+        }
+
+        internal static void RecordInterval(UsageLog log, DateTime startUtc, DateTime nowUtc, double elapsed,
+            double previousIdle, ApplicationInfo previousApp, double idle, ApplicationInfo app)
+        {
+            double wallElapsed = (nowUtc - startUtc).TotalSeconds;
+            if (elapsed <= 0 || elapsed > 5 || wallElapsed <= 0 || Math.Abs(wallElapsed - elapsed) >= 2)
+                return;
+
+            double previousActive = Math.Max(0, IdleLimitSeconds - previousIdle);
+            double inputOffset = elapsed - idle;
+            bool inputDuringInterval = idle >= 0 && inputOffset > 0 && idle < previousIdle;
+            if (inputDuringInterval && inputOffset <= previousActive)
+                previousActive = elapsed;
+
+            double active = Math.Min(elapsed, previousActive);
+            if (previousApp != null && active > 0)
+                log.Add(startUtc, startUtc.AddTicks((long)(active * TimeSpan.TicksPerSecond)), previousApp);
+
+            // Resume on the observed app when a new input falls after the previous idle cutoff.
+            if (app != null && inputDuringInterval && inputOffset > previousActive && idle > 0)
+                log.Add(startUtc.AddTicks((long)(inputOffset * TimeSpan.TicksPerSecond)),
+                    startUtc.AddTicks((long)(elapsed * TimeSpan.TicksPerSecond)), app);
         }
     }
 

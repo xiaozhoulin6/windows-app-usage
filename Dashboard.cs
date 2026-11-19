@@ -68,7 +68,7 @@ namespace AppUsage
             var root = new DockPanel { LastChildFill = true };
             Content = root;
 
-            note = Text("关闭窗口后将在通知区域继续记录", 12, Palette.Muted);
+            note = Text(TrackingNote, 12, Palette.Muted);
             note.TextWrapping = TextWrapping.Wrap;
             var footer = new Border
             {
@@ -236,7 +236,7 @@ namespace AppUsage
                 statusText.Foreground = attention ? Palette.Warning : Palette.Accent;
                 statusPill.Background = attention ? Palette.WarningSoft : Palette.AccentSoft;
                 note.Foreground = error != null ? Palette.Warning : Palette.Muted;
-                note.Text = error ?? "关闭窗口后将在通知区域继续记录";
+                note.Text = error ?? TrackingNote;
                 previousStatus = status;
                 previousError = error;
             }
@@ -293,7 +293,7 @@ namespace AppUsage
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(77) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(105) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(152) });
                 var identification = new DockPanel { Margin = new Thickness(0, 0, 12, 0) };
                 var appIcon = AppIcon(icons.Get(app.Id));
                 appIcon.Margin = new Thickness(0, 0, 9, 0);
@@ -362,20 +362,28 @@ namespace AppUsage
             };
         }
 
-        internal static string FormatTime(double seconds)
+        private const string TrackingNote = "仅统计前台应用，键鼠 2 分钟无操作后暂停。关闭窗口后将在通知区域继续记录。";
+
+        internal static string FormatTime(double seconds, bool includeSeconds = true)
         {
+            if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds > TimeSpan.MaxValue.TotalSeconds)
+                return "无效时长";
             if (seconds <= 0)
                 return "0 分钟";
 
-            var elapsed = TimeSpan.FromSeconds(Math.Floor(seconds));
-            if (elapsed.TotalMinutes < 1)
-                return Math.Max(1, elapsed.Seconds) + " 秒";
-
-            int hours = (int)elapsed.TotalHours;
+            long whole = (long)seconds;
+            if (whole == 0)
+                return "不足 1 秒";
+            long hours = whole / 3600;
+            long minutes = whole / 60 % 60;
+            string secondsText = (whole % 60) + " 秒";
+            if (whole < 60)
+                return secondsText;
+            string precision = includeSeconds ? " " + secondsText : "";
             if (hours == 0)
-                return elapsed.Minutes + " 分钟";
-
-            return hours + " 小时" + (elapsed.Minutes == 0 ? "" : " " + elapsed.Minutes + " 分钟");
+                return minutes + " 分钟" + precision;
+            string minuteText = minutes > 0 || includeSeconds ? " " + minutes + " 分钟" : "";
+            return hours + " 小时" + minuteText + precision;
         }
 
         private static Grid TwoColumns(double left = 1, double right = 0)
@@ -463,7 +471,7 @@ namespace AppUsage
             {
                 double y = top + height * row / 2;
                 dc.DrawLine(GridLine, new Point(left, y), new Point(ActualWidth - 1, y));
-                var label = Label(row == 2 ? "0" : Dashboard.FormatTime(maximum * (2 - row) / 2));
+                var label = Label(row == 2 ? "0" : Dashboard.FormatTime(maximum * (2 - row) / 2, false));
                 dc.DrawText(label, new Point(left - label.Width - 7, y - label.Height / 2));
             }
 

@@ -1,4 +1,4 @@
-param([string]$OutputPath)
+param([string]$OutputPath, [switch]$Test)
 
 $ErrorActionPreference = 'Stop'
 $framework = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
@@ -24,6 +24,22 @@ $assemblies = @(
 $references = $assemblies | ForEach-Object { '/reference:' + (Join-Path $framework $_) }
 $sources = 'Program.cs', 'Dashboard.cs', 'ActivityTracker.cs', 'ApplicationIcons.cs', 'UsageLog.cs' |
     ForEach-Object { Join-Path $PSScriptRoot $_ }
+if ($Test) {
+    $testDirectory = Join-Path ([IO.Path]::GetTempPath()) ('app-usage-tests-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $testDirectory | Out-Null
+    $testExecutable = Join-Path $testDirectory 'UsageLogTests.exe'
+    $testSource = Join-Path $PSScriptRoot 'tests\UsageLogTests.cs'
+    & $compiler /nologo /target:exe /optimize+ /codepage:65001 /main:AppUsage.UsageLogTests `
+        "/out:$testExecutable" @references @sources $testSource
+    if ($LASTEXITCODE -ne 0) {
+        throw "Test build failed with exit code $LASTEXITCODE."
+    }
+    & $testExecutable $testDirectory
+    if ($LASTEXITCODE -ne 0) {
+        throw "Tests failed with exit code $LASTEXITCODE. Test files are in $testDirectory."
+    }
+    return
+}
 # Express the Unicode file name without depending on PowerShell 5.1 source encoding.
 $name = -join ([char[]](0x8F6F, 0x4EF6, 0x4F7F, 0x7528, 0x60C5, 0x51B5))
 $output = if ($OutputPath) {

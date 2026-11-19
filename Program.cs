@@ -63,6 +63,7 @@ namespace AppUsage
         private readonly Stopwatch sinceSave = Stopwatch.StartNew();
         private bool exiting;
         private bool ranIconLookup;
+        private bool storageWarningActive;
         private string saveError;
         private Dashboard window;
         private int selectedRange;
@@ -111,6 +112,7 @@ namespace AppUsage
         internal void RunApp(bool background)
         {
             tray.Visible = true;
+            UpdateStorageStatus();
             tracker.Sample();
             timer.Start();
             if (!background)
@@ -154,12 +156,29 @@ namespace AppUsage
             }
             catch (IOException)
             {
-                saveError = "暂时无法保存使用记录";
+                saveError = "暂时无法保存使用记录，正在重试";
             }
             catch (UnauthorizedAccessException)
             {
-                saveError = "没有使用记录的写入权限";
+                saveError = "无法写入使用记录，请检查保存目录的权限";
             }
+            UpdateStorageStatus();
+        }
+
+        private void UpdateStorageStatus()
+        {
+            string issue = log.LoadError ?? saveError;
+            if (window != null && window.IsVisible)
+                window.UpdateStatus(tracker.Status, issue);
+
+            bool failed = issue != null;
+            if (failed == storageWarningActive)
+                return;
+            storageWarningActive = failed;
+            tray.Text = failed ? "应用使用情况 · 记录异常" : "应用使用情况";
+            if (failed && tray.Visible)
+                tray.ShowBalloonTip(5000, "使用记录异常", issue + "。新记录暂存在内存，退出前请留意保存状态。",
+                    Forms.ToolTipIcon.Warning);
         }
 
         private void ShowWindow()

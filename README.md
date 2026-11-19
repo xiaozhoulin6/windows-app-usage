@@ -22,6 +22,8 @@
 - 排行显示可获取的应用图标。旧记录若暂时缺少图标，会显示通用图标，可在再次使用对应应用时补齐。
 - 应用标识、名称和按小时汇总的时长保存在本机的 `%LOCALAPPDATA%\AppUsage`。同目录缓存可获取的应用图标。程序无需联网，不记录窗口标题、网址或键盘输入内容。
 
+使用记录保存在 `usage.tsv`，上一份记录保存在 `usage.tsv.bak`。主文件损坏时，程序会尝试从有效的备份恢复，并在写回时保留备份和损坏的主文件副本。暂时无法读取或保存时，程序会在界面和通知区域提示，保留内存中的新增记录并定期重试。
+
 ## 从源码构建
 
 在项目目录运行以下命令。构建使用 Windows 自带的 .NET Framework C# 编译器，无需安装额外的 SDK 或依赖。
@@ -29,5 +31,11 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 
 生成的 `软件使用情况.exe` 位于项目目录。
+
+运行日志恢复、计时和显示格式测试：
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Test
+
+测试使用独立的临时目录。
 
 本项目使用 Codex 辅助开发。
